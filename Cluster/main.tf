@@ -1,53 +1,57 @@
+
 provider "aws" {
   region = "ap-south-1"
 }
 
-# Use your existing VPC
-data "aws_vpc" "existing_vpc" {
-  id = "vpc-0fd0b7b32b2a42bce"  # Your existing VPC
+resource "aws_vpc" "devopsshack_vpc" {
+  cidr_block = "10.0.0.0/16"
+
+  tags = {
+    Name = "devopsshack-vpc"
+  }
 }
 
-resource "aws_subnet" "sunil_subnet" {  # Changed subnet name to include your name
+resource "aws_subnet" "devopsshack_subnet" {
   count = 2
-  vpc_id                  = data.aws_vpc.existing_vpc.id
-  cidr_block              = cidrsubnet(data.aws_vpc.existing_vpc.cidr_block, 8, count.index)
+  vpc_id                  = aws_vpc.devopsshack_vpc.id
+  cidr_block              = cidrsubnet(aws_vpc.devopsshack_vpc.cidr_block, 8, count.index)
   availability_zone       = element(["ap-south-1a", "ap-south-1b"], count.index)
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "sunil-subnet-${count.index}"  # Updated tag to include your name
+    Name = "devopsshack-subnet-${count.index}"
   }
 }
 
-resource "aws_internet_gateway" "sunil_igw" {  # Updated IGW name
-  vpc_id = data.aws_vpc.existing_vpc.id
+resource "aws_internet_gateway" "devopsshack_igw" {
+  vpc_id = aws_vpc.devopsshack_vpc.id
 
   tags = {
-    Name = "sunil-igw"  # Updated tag to include your name
+    Name = "devopsshack-igw"
   }
 }
 
-resource "aws_route_table" "sunil_route_table" {  # Updated route table name
-  vpc_id = data.aws_vpc.existing_vpc.id
+resource "aws_route_table" "devopsshack_route_table" {
+  vpc_id = aws_vpc.devopsshack_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.sunil_igw.id  # Reference updated IGW
+    gateway_id = aws_internet_gateway.devopsshack_igw.id
   }
 
   tags = {
-    Name = "sunil-route-table"  # Updated tag to include your name
+    Name = "devopsshack-route-table"
   }
 }
 
 resource "aws_route_table_association" "a" {
   count          = 2
-  subnet_id      = aws_subnet.sunil_subnet[count.index].id  # Reference updated subnet
-  route_table_id = aws_route_table.sunil_route_table.id  # Reference updated route table
+  subnet_id      = aws_subnet.devopsshack_subnet[count.index].id
+  route_table_id = aws_route_table.devopsshack_route_table.id
 }
 
-resource "aws_security_group" "sunil_cluster_sg" {  # Updated cluster SG name
-  vpc_id = data.aws_vpc.existing_vpc.id
+resource "aws_security_group" "devopsshack_cluster_sg" {
+  vpc_id = aws_vpc.devopsshack_vpc.id
 
   egress {
     from_port   = 0
@@ -57,12 +61,12 @@ resource "aws_security_group" "sunil_cluster_sg" {  # Updated cluster SG name
   }
 
   tags = {
-    Name = "sunil-cluster-sg"  # Updated tag to include your name
+    Name = "devopsshack-cluster-sg"
   }
 }
 
-resource "aws_security_group" "sunil_node_sg" {  # Updated node SG name
-  vpc_id = data.aws_vpc.existing_vpc.id
+resource "aws_security_group" "devopsshack_node_sg" {
+  vpc_id = aws_vpc.devopsshack_vpc.id
 
   ingress {
     from_port   = 0
@@ -79,25 +83,25 @@ resource "aws_security_group" "sunil_node_sg" {  # Updated node SG name
   }
 
   tags = {
-    Name = "sunil-node-sg"  # Updated tag to include your name
+    Name = "devopsshack-node-sg"
   }
 }
 
-resource "aws_eks_cluster" "sunil" {  # Updated EKS cluster name
-  name     = "sunil-cluster"  # Updated cluster name to include your name
+resource "aws_eks_cluster" "devopsshack" {
+  name     = "devopsshack-cluster"
   role_arn = aws_iam_role.devopsshack_cluster_role.arn
 
   vpc_config {
-    subnet_ids         = aws_subnet.sunil_subnet[*].id  # Reference updated subnet
-    security_group_ids = [aws_security_group.sunil_cluster_sg.id]  # Reference updated SG
+    subnet_ids         = aws_subnet.devopsshack_subnet[*].id
+    security_group_ids = [aws_security_group.devopsshack_cluster_sg.id]
   }
 }
 
-resource "aws_eks_node_group" "sunil" {  # Updated node group name
-  cluster_name    = aws_eks_cluster.sunil.name  # Reference updated cluster
-  node_group_name = "sunil-node-group"  # Updated node group name to include your name
+resource "aws_eks_node_group" "devopsshack" {
+  cluster_name    = aws_eks_cluster.devopsshack.name
+  node_group_name = "devopsshack-node-group"
   node_role_arn   = aws_iam_role.devopsshack_node_group_role.arn
-  subnet_ids      = aws_subnet.sunil_subnet[*].id  # Reference updated subnet
+  subnet_ids      = aws_subnet.devopsshack_subnet[*].id
 
   scaling_config {
     desired_size = 3
@@ -108,8 +112,8 @@ resource "aws_eks_node_group" "sunil" {  # Updated node group name
   instance_types = ["t2.large"]
 
   remote_access {
-    ec2_ssh_key = "Mom"  # Your key pair name
-    source_security_group_ids = [aws_security_group.sunil_node_sg.id]  # Reference updated SG
+    ec2_ssh_key = var.ssh_key_name
+    source_security_group_ids = [aws_security_group.devopsshack_node_sg.id]
   }
 }
 
